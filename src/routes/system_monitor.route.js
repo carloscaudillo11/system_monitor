@@ -5,6 +5,7 @@ import serverSchema from "../schemas/server.schema.js";
 
 const router = Router();
 
+router.get("/", (req, res) => res.send("System Monitor"));
 router.post("/monitor_linux", validateSchema(serverSchema), system_monitor);
 
 export default router;
