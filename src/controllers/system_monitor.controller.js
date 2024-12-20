@@ -1,11 +1,11 @@
 import executeSSHCommand from "../lib/execute_command.js";
 import System_info from "../models/system_info.model.js";
+import IA_response from "../lib/IA_response.js";
 
 const system_monitor = async (req, res) => {
   try {
     const { host, username, password, sshPort } = req.body;
 
-    // Comandos
     const commands = {
       memory: "free -m | awk 'NR==2{printf \"%.2f\", $3*100/$2 }'",
       disks: "df -h | awk 'NR>1 {print $1, $2, $3, $4, $5, $6}'",
@@ -16,7 +16,6 @@ const system_monitor = async (req, res) => {
       errors: "journalctl -p 3 -b",
     };
 
-    // Ejecutar todos los comandos excepto el de CPU
     const otherResults = await Promise.all(
       Object.entries(commands).map(([key, command]) =>
         executeSSHCommand(host, username, password, sshPort, command).then(
@@ -25,10 +24,8 @@ const system_monitor = async (req, res) => {
       )
     );
 
-    // Obtener resultados intermedios
     const stats = Object.fromEntries(otherResults);
 
-    // Procesar discos
     const diskList = stats.disks
       .split("\n")
       .map((line) => {
@@ -43,7 +40,6 @@ const system_monitor = async (req, res) => {
         parseInt(b.usage.replace("%", "")) - parseInt(a.usage.replace("%", ""))
     );
 
-    // Ejecutar el comando de CPU después de los otros
     const cpuUsage = await executeSSHCommand(
       host,
       username,
@@ -52,7 +48,6 @@ const system_monitor = async (req, res) => {
       "top -bn1 | grep 'Cpu(s)' | awk '{print $2 + $4}'"
     );
 
-    // Crear el documento con todos los resultados
     const systemInfo = new System_info({
       cpu_usage: `${cpuUsage}%`,
       memory_usage: `${stats.memory}%`,
@@ -63,23 +58,30 @@ const system_monitor = async (req, res) => {
       errors: stats.errors.split("\n"),
     });
 
-    // Guardar en la base de datos
     const savedSystemInfo = await systemInfo.save();
 
-    // Devolver la respuesta
     res.json(savedSystemInfo);
   } catch (error) {
     res.status(500).json({ error });
   }
 };
 
-const generateReport = async (req, res) => {
+const getIAResponse = async (_req, res) => {
   try {
-    const report = await System_info.find();
-    res.json(report);
+    //const report = await System_info.find();
+    const apiRequestJson = {
+      messages: [
+        { role: "user", content: "What is the weather like in Boston?" },
+      ],
+      stream: true,
+    };
+
+    const response = await IA_response(apiRequestJson);
+    console.log(response);
+    res.json(response);
   } catch (error) {
     res.status(500).json({ error });
   }
 };
 
-export default { system_monitor, generateReport };
+export { system_monitor, getIAResponse };
