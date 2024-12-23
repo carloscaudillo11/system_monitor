@@ -68,20 +68,61 @@ const system_monitor = async (req, res) => {
 
 const getIAResponse = async (_req, res) => {
   try {
-    //const report = await System_info.find();
+    const lastDocument = await System_info.findOne().sort({ createdAt: -1 });
+
+    if (!lastDocument) {
+      return res
+        .status(404)
+        .json({ error: "No se encontraron datos en el sistema." });
+    }
+
     const apiRequestJson = {
+      model: "llama3.1-8b",
+      max_tokens: 1000,
+      temperature: 0.5,
+      top_p: 1.0,
+      frequency_penalty: 1.0,
       messages: [
-        { role: "user", content: "What is the weather like in Boston?" },
+        {
+          role: "system",
+          content: "You are a expert assistant from infraestructure team.",
+        },
+        {
+          role: "user",
+          content: `Create a system monitor report detailed from this data: ${JSON.stringify(
+            lastDocument
+          )}`,
+        },
       ],
-      stream: true,
+      stream: false,
     };
 
-    const response = await IA_response(apiRequestJson);
-    console.log(response);
-    res.json(response);
+    const { choices } = await IA_response(apiRequestJson);
+
+    if (!choices || choices.length === 0) {
+      return res
+        .status(500)
+        .json({ error: "La respuesta de la IA está vacía o es inválida." });
+    }
+
+    res.json({ content: choices[0].message.content });
+  } catch (error) {
+    console.error("Error en getIAResponse:", error);
+
+    res.status(500).json({
+      error: "Error al generar la respuesta de la IA.",
+      details: error.message,
+    });
+  }
+};
+
+const getLastDocument = async (_req, res) => {
+  try {
+    const lastDocument = await System_info.findOne().sort({ createdAt: -1 });
+    res.json(lastDocument);
   } catch (error) {
     res.status(500).json({ error });
   }
 };
 
-export { system_monitor, getIAResponse };
+export { system_monitor, getIAResponse, getLastDocument };
