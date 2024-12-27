@@ -1,6 +1,7 @@
 import executeSSHCommand from "../lib/execute_command.js";
 import System_info from "../models/system_info.model.js";
 import IA_response from "../lib/IA_response.js";
+import create_report from "../lib/create_report.js";
 
 const system_monitor = async (req, res) => {
   try {
@@ -79,17 +80,17 @@ const getIAResponse = async (_req, res) => {
     const apiRequestJson = {
       model: "llama3.1-8b",
       max_tokens: 1000,
-      temperature: 0.5,
+      temperature: 0.7,
       top_p: 1.0,
       frequency_penalty: 1.0,
       messages: [
         {
           role: "system",
-          content: "You are a expert assistant from infraestructure team.",
+          content: "Eres un experto en infraestructura que habla español.",
         },
         {
           role: "user",
-          content: `Create a system monitor report detailed from this data: ${JSON.stringify(
+          content: `Crea un reporte detallado del estado del servidor con estos datos: ${JSON.stringify(
             lastDocument
           )}`,
         },
@@ -105,12 +106,13 @@ const getIAResponse = async (_req, res) => {
         .json({ error: "La respuesta de la IA está vacía o es inválida." });
     }
 
-    res.json({ content: choices[0].message.content });
+    const pdfBytes = await create_report(choices[0].message.content);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=informe_estado_servidor.pdf');
+    res.send(pdfBytes);
   } catch (error) {
-    console.error("Error en getIAResponse:", error);
-
     res.status(500).json({
-      error: "Error al generar la respuesta de la IA.",
+      error: "Error al generar el informe.",
       details: error.message,
     });
   }
